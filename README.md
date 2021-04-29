@@ -11,13 +11,19 @@
 
 ## Usage
 
-__go-vgr's options__
+```
+#go-vgr {pattern} {path}
+```
+`{pattern}` is a Regexp pattern of golang.  
+`{path}` is a glob pattern of [zglob](https://github.com/mattn/go-zglob).  
+
+### go-vgr's options
 ```
 -t     : tabstop (default:8)
 -c     : highlight matched text (default:false)
 ```
 
-__vim settings__
+### vim settings
 ```
 if executable('go-vgr')
 	set grepprg=go-vgr
@@ -26,8 +32,6 @@ endif
 ```
 
 We recommend to use `-t` option if `&tabstop` in your Vim is not 8.
-
-__example__
 ```
 set grepprg=go-vgr\ -t\ 4
 ```

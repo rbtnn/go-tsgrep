@@ -54,35 +54,40 @@ func grep(path string) {
 
 	reader := bufio.NewReaderSize(fp, 1024)
 	lnum := 0
+	var line []byte
 	for {
-		line, _, err := reader.ReadLine()
+		tmp, isPrefix, err := reader.ReadLine()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			panic(err)
 		}
-		lnum++
-		if text, err := convert(line); err == nil {
-			text = []byte(expandTabs(string(text)))
-			xs := global.regex.FindAllIndex(text, -1)
-			for i := 0; i < len(xs); i++ {
-				head := string(text[:xs[i][0]])
-				middle := string(text[xs[i][0]:xs[i][1]])
-				tail := string(text[xs[i][1]:])
-				col := runewidth.StringWidth(head) + 1
-				fmt.Fprint(global.stdOut, fmt.Sprintf("%s(%d,%d):", path, lnum, col))
-				fmt.Fprint(global.stdOut, head)
-				if *global.color {
-					fmt.Fprint(global.stdOut, string("\x1b[32m"))
+		line = append(line, tmp...)
+		if !isPrefix {
+			lnum++
+			if text, err := convert(line); err == nil {
+				text = []byte(expandTabs(string(text)))
+				xs := global.regex.FindAllIndex(text, -1)
+				for i := 0; i < len(xs); i++ {
+					head := string(text[:xs[i][0]])
+					middle := string(text[xs[i][0]:xs[i][1]])
+					tail := string(text[xs[i][1]:])
+					col := runewidth.StringWidth(head) + 1
+					fmt.Fprint(global.stdOut, fmt.Sprintf("%s(%d,%d):", path, lnum, col))
+					fmt.Fprint(global.stdOut, head)
+					if *global.color {
+						fmt.Fprint(global.stdOut, string("\x1b[32m"))
+					}
+					fmt.Fprint(global.stdOut, middle)
+					if *global.color {
+						fmt.Fprint(global.stdOut, string("\x1b[39m"))
+					}
+					fmt.Fprintln(global.stdOut, tail)
+					global.stdOut.Flush()
 				}
-				fmt.Fprint(global.stdOut, middle)
-				if *global.color {
-					fmt.Fprint(global.stdOut, string("\x1b[39m"))
-				}
-				fmt.Fprintln(global.stdOut, tail)
-				global.stdOut.Flush()
 			}
+			line = nil
 		}
 	}
 }

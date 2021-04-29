@@ -17,7 +17,6 @@ import (
 	"strings"
 )
 
-
 var (
 	global struct {
 		detector *chardet.Detector

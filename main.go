@@ -15,37 +15,47 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 )
 
 var (
 	global struct {
-		detector *chardet.Detector
-		stdOut   *bufio.Writer
-		tabstop  *int
-		color    *bool
-		regex    *regexp.Regexp
+		detector          *chardet.Detector
+		stdOut            *bufio.Writer
+		tabstop           *int
+		highlight         *bool
+		regex             *regexp.Regexp
+		not_use_chardet   *bool
+		not_use_goroutine *bool
 	}
 )
 
 func convert(line []byte) ([]byte, error) {
-	if all, err := global.detector.DetectAll(line); err == nil {
-		for i := 0; i < len(all); i++ {
-			switch all[i].Charset {
-			case "UTF-8":
-				return line, nil
-			case "EUC-JP":
-				result, _, _ := transform.Bytes(japanese.EUCJP.NewDecoder(), line)
-				return result, nil
-			case "Shift_JIS":
-				result, _, _ := transform.Bytes(japanese.ShiftJIS.NewDecoder(), line)
-				return result, nil
+	if *global.not_use_chardet {
+		return line, nil
+	} else {
+		if all, err := global.detector.DetectAll(line); err == nil {
+			for i := 0; i < len(all); i++ {
+				switch all[i].Charset {
+				case "UTF-8":
+					return line, nil
+				case "EUC-JP":
+					result, _, _ := transform.Bytes(japanese.EUCJP.NewDecoder(), line)
+					return result, nil
+				case "Shift_JIS":
+					result, _, _ := transform.Bytes(japanese.ShiftJIS.NewDecoder(), line)
+					return result, nil
+				}
 			}
 		}
+		return nil, errors.New("Charset not detected.")
 	}
-	return nil, errors.New("Charset not detected.")
 }
 
-func grep(path string) {
+func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
+	defer wg.Done()
+
 	fp, err := os.Open(path)
 	if err != nil {
 		panic(err)
@@ -65,40 +75,35 @@ func grep(path string) {
 		}
 		line = append(line, tmp...)
 		if !isPrefix {
-			lnum++
-			if text, err := convert(line); err == nil {
-				text = []byte(expandTabs(string(text)))
-				xs := global.regex.FindAllIndex(text, -1)
-				for i := 0; i < len(xs); i++ {
-					head := string(text[:xs[i][0]])
-					middle := string(text[xs[i][0]:xs[i][1]])
-					tail := string(text[xs[i][1]:])
-					col := runewidth.StringWidth(head) + 1
-					fmt.Fprint(global.stdOut, fmt.Sprintf("%s(%d,%d):", path, lnum, col))
-					fmt.Fprint(global.stdOut, head)
-					if *global.color {
-						fmt.Fprint(global.stdOut, string("\x1b[32m"))
+			func() {
+				mu.Lock()
+				defer mu.Unlock()
+				lnum++
+				if text, err := convert(line); err == nil {
+					text = []byte(expandTabs(string(text)))
+					xs := global.regex.FindAllIndex(text, -1)
+					for i := 0; i < len(xs); i++ {
+						head := string(text[:xs[i][0]])
+						middle := string(text[xs[i][0]:xs[i][1]])
+						tail := string(text[xs[i][1]:])
+						col := runewidth.StringWidth(head) + 1
+						fmt.Fprint(global.stdOut, fmt.Sprintf("%s(%d,%d):", path, lnum, col))
+						fmt.Fprint(global.stdOut, head)
+						if *global.highlight {
+							fmt.Fprint(global.stdOut, string("\x1b[32m"))
+						}
+						fmt.Fprint(global.stdOut, middle)
+						if *global.highlight {
+							fmt.Fprint(global.stdOut, string("\x1b[39m"))
+						}
+						fmt.Fprintln(global.stdOut, tail)
+						global.stdOut.Flush()
 					}
-					fmt.Fprint(global.stdOut, middle)
-					if *global.color {
-						fmt.Fprint(global.stdOut, string("\x1b[39m"))
-					}
-					fmt.Fprintln(global.stdOut, tail)
-					global.stdOut.Flush()
 				}
-			}
-			line = nil
+				line = nil
+			}()
 		}
 	}
-}
-
-func contains(xs []string, x string) bool {
-	for i := 0; i < len(xs); i++ {
-		if xs[i] == x {
-			return true
-		}
-	}
-	return false
 }
 
 func expandTabs(s string) string {
@@ -137,25 +142,35 @@ func isBinary(path string) bool {
 }
 
 func main() {
+	start := time.Now()
 	global.detector = chardet.NewTextDetector()
 	global.stdOut = bufio.NewWriter(colorable.NewColorableStdout())
 	global.tabstop = flag.Int("t", 8, "tabstop")
-	global.color = flag.Bool("c", false, "color")
+	global.highlight = flag.Bool("h", false, "highlight matched text")
+	global.not_use_chardet = flag.Bool("c", false, "not use chardet")
+	global.not_use_goroutine = flag.Bool("g", false, "not use goroutine")
 	flag.Parse()
 	args := flag.Args()
 	if 2 == len(args) {
 		global.regex = regexp.MustCompile(args[0])
+		var wg sync.WaitGroup
+		var mu sync.Mutex
 		if matches, err := zglob.Glob(args[1]); err == nil {
 			for i := 0; i < len(matches); i++ {
 				if f, err := os.Stat(matches[i]); !os.IsNotExist(err) && !f.IsDir() {
-					if isBinary(matches[i]) {
-						// fmt.Fprintln(global.stdOut, fmt.Sprintf("'%s' is a binary file.", matches[i]))
-						// global.stdOut.Flush()
-					} else {
-						grep(matches[i])
+					if !isBinary(matches[i]) {
+						wg.Add(1)
+						if *global.not_use_goroutine {
+							grep(&wg, &mu, matches[i])
+						} else {
+							go grep(&wg, &mu, matches[i])
+						}
 					}
 				}
 			}
 		}
+		wg.Wait()
 	}
+	elapsed := time.Since(start)
+	fmt.Printf("elapsed time: %v\n", elapsed)
 }

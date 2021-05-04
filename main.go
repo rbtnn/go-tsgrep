@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"path/filepath"
 	"fmt"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-runewidth"
@@ -28,6 +29,7 @@ var (
 		highlight          *bool
 		debug              *bool
 		ignore_directories *string
+		ignore_extensions  *string
 		pattern_re         *regexp.Regexp
 		modeline_re        *regexp.Regexp
 	}
@@ -86,6 +88,9 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 		if strings.Contains(*global.ignore_directories, x) {
 			return
 		}
+	}
+	if strings.Contains(*global.ignore_extensions, filepath.Ext(path)) {
+		return
 	}
 
 	fp, err := os.Open(path)
@@ -202,13 +207,23 @@ func expandTabs(s string, ts int) string {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s [OPTIONS] {pattern} {path}\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "Example:\n")
+		fmt.Fprintf(os.Stderr, "  >go-vgr -color -tabstop 4 set **/*\n")
+	}
 	global.detector = chardet.NewTextDetector()
 	global.stdOut = bufio.NewWriter(colorable.NewColorableStdout())
-	global.ignore_directories = flag.String("i", ".git,.gh,.hg,.svn,_svn", "ignore directories")
-	global.tabstop = flag.Int("t", 8, "default tabstop")
-	global.debug = flag.Bool("d", false, "debug mode")
-	global.bytesOfDetection = flag.Int("b", 100, "bytes of encoding detection")
-	global.highlight = flag.Bool("c", false, "highlight matched text")
+	global.ignore_directories = flag.String("ignore-dir", ".git,.gh,.hg,.svn,_svn", "ignore directories")
+	global.ignore_extensions = flag.String("ignore-ext", ".exe,.dll,.obj,.mp3,mp4", "ignore extensions")
+	global.tabstop = flag.Int("tabstop", 8, "default tabstop")
+	global.debug = flag.Bool("debug", false, "debug mode")
+	global.bytesOfDetection = flag.Int("detect", 100, "bytes of filetype detection")
+	global.highlight = flag.Bool("color", false, "color matched text")
 	flag.Parse()
 	args := flag.Args()
 	if 2 == len(args) {

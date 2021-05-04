@@ -12,18 +12,32 @@
 ## Usage
 
 ```
-#go-vgr {pattern} {path}
-```
-`{pattern}` is a Regexp pattern of golang.  
-`{path}` is a glob pattern of [zglob](https://github.com/mattn/go-zglob).  
+>go-vgr.exe -h
+go-vgr.exe [OPTIONS] {pattern} {path}
 
-### go-vgr's options
-```
--t     : tabstop (default:8)
--c     : highlight matched text (default:false)
+Options:
+  -color
+        color matched text
+  -debug
+        debug mode
+  -detect int
+        bytes of filetype detection (default 100)
+  -ignore-dir string
+        ignore directories (default ".git,.gh,.hg,.svn,_svn")
+  -ignore-ext string
+        ignore extensions (default ".exe,.dll,.obj,.mp3,mp4")
+  -tabstop int
+        default tabstop (default 8)
+
+Example:
+  >go-vgr -color -tabstop 4 set **/*
+
 ```
 
-### vim settings
+### Using Vim
+
+If you use this in Vim, you put following code in your .vimrc:
+
 ```
 if executable('go-vgr')
 	set grepprg=go-vgr
@@ -31,8 +45,9 @@ if executable('go-vgr')
 endif
 ```
 
-We recommend to use `-t` option if `&tabstop` in your Vim is not 8.
+We recommend to use `-tabstop` option if `&tabstop` in your Vim is not 8.
+
 ```
-set grepprg=go-vgr\ -t\ 4
+set grepprg=go-vgr\ -tabstop\ 4
 ```
 

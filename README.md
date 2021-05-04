@@ -5,10 +5,10 @@
 
 There are following lines as `abc.txt`:  
 ```
+// vi: set ts=4 :
 This tabstop is 4.
 --->This tabstop is 4.
 --->--->This tabstop is 4.
-// vim: set ts=4 :
 ```
 And execute `go-vgr is abc.txt`:  
 ![](https://raw.githubusercontent.com/rbtnn/go-vgr/main/abc.jpg)

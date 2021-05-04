@@ -20,7 +20,7 @@
 ### go-vgr's options
 ```
 -t     : tabstop (default:8)
--h     : highlight matched text (default:false)
+-c     : highlight matched text (default:false)
 ```
 
 ### vim settings

@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"flag"
-	"path/filepath"
 	"fmt"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-runewidth"
@@ -13,6 +12,7 @@ import (
 	"golang.org/x/text/transform"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,16 +22,16 @@ import (
 
 var (
 	global struct {
-		detector           *chardet.Detector
-		stdOut             *bufio.Writer
-		bytesOfDetection   *int
-		tabstop            *int
-		highlight          *bool
-		debug              *bool
-		ignore_directories *string
-		ignore_extensions  *string
-		pattern_re         *regexp.Regexp
-		modeline_re        *regexp.Regexp
+		detector          *chardet.Detector
+		stdOut            *bufio.Writer
+		bytesOfDetection  *int
+		tabstop           *int
+		highlight         *bool
+		debugMode         *bool
+		ignoreDirectories *string
+		ignoreExtensions  *string
+		patternRegex      *regexp.Regexp
+		modelineRegex     *regexp.Regexp
 	}
 )
 
@@ -85,11 +85,11 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 
 	xs := strings.Split(path, "/")
 	for _, x := range xs {
-		if strings.Contains(*global.ignore_directories, x) {
+		if strings.Contains(*global.ignoreDirectories, x) {
 			return
 		}
 	}
-	if strings.Contains(*global.ignore_extensions, filepath.Ext(path)) {
+	if strings.Contains(*global.ignoreExtensions, filepath.Ext(path)) {
 		return
 	}
 
@@ -100,7 +100,7 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 	defer fp.Close()
 
 	ft := checkFileType(fp)
-	if *global.debug {
+	if *global.debugMode {
 		if ft == BinaryFile {
 			fmt.Println(path + "(0,0): a binary file.")
 		} else if ft == UTF8File {
@@ -153,7 +153,7 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 	mu.Lock()
 	defer mu.Unlock()
 	for _, x := range matches {
-		xs := global.pattern_re.FindAllIndex([]byte(x.line), -1)
+		xs := global.patternRegex.FindAllIndex([]byte(x.line), -1)
 		for i := 0; i < len(xs); i++ {
 			head := string(x.line[:xs[i][0]])
 			middle := string(x.line[xs[i][0]:xs[i][1]])
@@ -176,13 +176,13 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 
 func parseModeLine(firstLine string, lastLine string) int {
 	ts := *global.tabstop
-	matches := global.modeline_re.FindAllStringSubmatch(firstLine, 1)
+	matches := global.modelineRegex.FindAllStringSubmatch(firstLine, 1)
 	if 0 < len(matches) {
 		if sv, err := strconv.Atoi(matches[0][2]); err == nil {
 			ts = sv
 		}
 	}
-	matches = global.modeline_re.FindAllStringSubmatch(lastLine, 1)
+	matches = global.modelineRegex.FindAllStringSubmatch(lastLine, 1)
 	if 0 < len(matches) {
 		if sv, err := strconv.Atoi(matches[0][2]); err == nil {
 			ts = sv
@@ -218,18 +218,18 @@ func main() {
 	}
 	global.detector = chardet.NewTextDetector()
 	global.stdOut = bufio.NewWriter(colorable.NewColorableStdout())
-	global.ignore_directories = flag.String("ignore-dir", ".git,.gh,.hg,.svn,_svn,node_modules", "ignore directories")
-	global.ignore_extensions = flag.String("ignore-ext", ".exe,.dll,.obj,.mp3,mp4", "ignore extensions")
+	global.ignoreDirectories = flag.String("ignore-dir", ".git,.gh,.hg,.svn,_svn,node_modules", "ignore directories")
+	global.ignoreExtensions = flag.String("ignore-ext", ".exe,.dll,.obj,.mp3,mp4", "ignore extensions")
 	global.tabstop = flag.Int("tabstop", 8, "default tabstop")
-	global.debug = flag.Bool("debug", false, "debug mode")
+	global.debugMode = flag.Bool("debug", false, "debug mode")
 	global.bytesOfDetection = flag.Int("detect", 100, "bytes of filetype detection")
 	global.highlight = flag.Bool("color", false, "color matched text")
 	flag.Parse()
 	args := flag.Args()
 	if 2 == len(args) {
 		start := time.Now()
-		global.pattern_re = regexp.MustCompile(args[0])
-		global.modeline_re = regexp.MustCompile("^(/|\\*|\\s)*vim?:\\s*set\\s+.*\\bts=(\\d+).*$")
+		global.patternRegex = regexp.MustCompile(args[0])
+		global.modelineRegex = regexp.MustCompile("^(/|\\*|\\s)*vim?:\\s*set\\s+.*\\bts=(\\d+).*$")
 		var wg sync.WaitGroup
 		var mu sync.Mutex
 		if matches, err := zglob.Glob(args[1]); err == nil {
@@ -242,7 +242,7 @@ func main() {
 		}
 		wg.Wait()
 		elapsed := time.Since(start)
-		if !*global.debug {
+		if !*global.debugMode {
 			fmt.Printf("elapsed time: %v\n", elapsed)
 		}
 	}

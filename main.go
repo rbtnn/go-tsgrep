@@ -214,7 +214,7 @@ func main() {
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "Example:\n")
-		fmt.Fprintf(os.Stderr, "  >go-vgr -color -tabstop 4 set **/*\n")
+		fmt.Fprintf(os.Stderr, "  >go-tsgrep -color -tabstop 4 set **/*\n")
 	}
 	global.detector = chardet.NewTextDetector()
 	global.stdOut = bufio.NewWriter(colorable.NewColorableStdout())

@@ -1,4 +1,4 @@
-module github.com/rbtnn/go-vgr
+module github.com/rbtnn/go-tsgrep
 
 go 1.16
 

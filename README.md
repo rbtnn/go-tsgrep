@@ -1,7 +1,7 @@
 
-# go-vgr
+# go-tsgrep
 
-`go-vgr` is grep for Vim. This considers tabstop and modeline each file.  
+`go-tsgrep` is grep for Vim. This considers tabstop and modeline each file.  
 
 There are following lines as `abc.txt`:  
 ```
@@ -10,21 +10,21 @@ This tabstop is 4.
 --->This tabstop is 4.
 --->--->This tabstop is 4.
 ```
-And execute `go-vgr is abc.txt`:  
-![](https://raw.githubusercontent.com/rbtnn/go-vgr/main/abc.jpg)
+And execute `go-tsgrep is abc.txt`:  
+![](https://raw.githubusercontent.com/rbtnn/go-tsgrep/main/abc.jpg)
 
 
 ## Install
 
 ```
-# go install github.com/rbtnn/go-vgr
+# go install github.com/rbtnn/go-tsgrep
 ```
 
 ## Usage
 
 ```
->go-vgr.exe -h
-go-vgr.exe [OPTIONS] {pattern} {path}
+>go-tsgrep.exe -h
+go-tsgrep.exe [OPTIONS] {pattern} {path}
 
 Options:
   -color
@@ -41,7 +41,7 @@ Options:
         default tabstop (default 8)
 
 Example:
-  >go-vgr -color -tabstop 4 set **/*
+  >go-tsgrep -color -tabstop 4 set **/*
 
 ```
 
@@ -50,8 +50,8 @@ Example:
 If you use this in Vim, you put following code in your .vimrc:
 
 ```
-if executable('go-vgr')
-	set grepprg=go-vgr
+if executable('go-tsgrep')
+	set grepprg=go-tsgrep
 	set grepformat=%f(%l\\,%v):%m
 endif
 ```
@@ -59,7 +59,7 @@ endif
 We recommend to use `-tabstop` option if `&tabstop` in your Vim is not 8.
 
 ```
-set grepprg=go-vgr\ -tabstop\ 4
+set grepprg=go-tsgrep\ -tabstop\ 4
 ```
 
 ## License

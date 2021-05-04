@@ -22,7 +22,6 @@ import (
 
 var (
 	global struct {
-		detector          *chardet.Detector
 		stdOut            *bufio.Writer
 		bytesOfDetection  *int
 		tabstop           *int
@@ -41,17 +40,31 @@ type LineInfo struct {
 	lnum int
 }
 
-type FileType int
+type GrepResult struct {
+	path   string
+	lnum   int
+	col    int
+	head   string
+	middle string
+	tail   string
+}
 
+type FileType int
 const (
 	BinaryFile FileType = iota
 	UTF8File
 	SJISFile
 )
 
-func checkFileType(fp *os.File) FileType {
+func CheckFileType(path string, bytesOfDetection int) FileType {
+	fp, err := os.Open(path)
+	if err != nil {
+		panic(err)
+	}
+	defer fp.Close()
+
 	// check if is a binary file.
-	buf := make([]byte, *global.bytesOfDetection)
+	buf := make([]byte, bytesOfDetection)
 	n, err := fp.Read(buf)
 	if err == nil {
 		for i := 0; i < n; i++ {
@@ -60,8 +73,9 @@ func checkFileType(fp *os.File) FileType {
 			}
 		}
 	}
-	fp.Seek(0, 0)
-	if all, err := global.detector.DetectAll(buf); err == nil {
+
+	detector := chardet.NewTextDetector()
+	if all, err := detector.DetectAll(buf); err == nil {
 		isUTF8 := false
 		isSJIS := false
 		for i := 0; i < len(all); i++ {
@@ -81,7 +95,7 @@ func checkFileType(fp *os.File) FileType {
 	return UTF8File
 }
 
-func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
+func GrepWrapper(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 	defer wg.Done()
 
 	xs := strings.Split(path, "/")
@@ -94,91 +108,106 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 		return
 	}
 
-	fp, err := os.Open(path)
-	if err != nil {
-		panic(err)
-	}
-	defer fp.Close()
+	ft := CheckFileType(path, *global.bytesOfDetection)
 
-	ft := checkFileType(fp)
-	if ft == BinaryFile {
-		return
-	}
-
-	reader := bufio.NewReaderSize(fp, 1024)
-	lnum := 0
-	matches := []LineInfo{}
-	var line []byte
-	var firstLine []byte
-	var lastLine []byte
-	for {
-		tmp, isPrefix, err := reader.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		line = append(line, tmp...)
-		if !isPrefix {
-			lnum++
-			if ft == SJISFile {
-				result, _, _ := transform.Bytes(japanese.ShiftJIS.NewDecoder(), line)
-				line = result
-			}
-			if lnum == 1 {
-				firstLine = line
-			} else {
-				lastLine = line
-			}
-			matches = append(matches, LineInfo{string(line), lnum})
-			line = nil
-		}
-	}
-
-	ts := parseModeLine(string(firstLine), string(lastLine))
-	for i := 0; i < len(matches); i++ {
-		matches[i].line = expandTabs(matches[i].line, ts)
-	}
+	result := GrepFile(path, ft, *global.regexMode, *global.tabstop, global.modelineRegex, global.patternRegex, *global.inputPattern)
 
 	mu.Lock()
 	defer mu.Unlock()
-	for _, x := range matches {
-		var xs [][]int
-		if *global.regexMode {
-			xs = global.patternRegex.FindAllIndex([]byte(x.line), -1)
-		} else {
-			xs = StringIndecies(x.line, *global.inputPattern)
+
+	for _, x := range result {
+		fmt.Fprint(global.stdOut, fmt.Sprintf("%s(%d,%d):", x.path, x.lnum, x.col))
+		fmt.Fprint(global.stdOut, x.head)
+		if *global.highlight {
+			fmt.Fprint(global.stdOut, string("\x1b[32m"))
 		}
-		for i := 0; i < len(xs); i++ {
-			head := string(x.line[:xs[i][0]])
-			middle := string(x.line[xs[i][0]:xs[i][1]])
-			tail := string(x.line[xs[i][1]:])
-			col := runewidth.StringWidth(head) + 1
-			fmt.Fprint(global.stdOut, fmt.Sprintf("%s(%d,%d):", path, x.lnum, col))
-			fmt.Fprint(global.stdOut, head)
-			if *global.highlight {
-				fmt.Fprint(global.stdOut, string("\x1b[32m"))
-			}
-			fmt.Fprint(global.stdOut, middle)
-			if *global.highlight {
-				fmt.Fprint(global.stdOut, string("\x1b[39m"))
-			}
-			fmt.Fprintln(global.stdOut, tail)
-			global.stdOut.Flush()
+		fmt.Fprint(global.stdOut, x.middle)
+		if *global.highlight {
+			fmt.Fprint(global.stdOut, string("\x1b[39m"))
 		}
+		fmt.Fprintln(global.stdOut, x.tail)
+		global.stdOut.Flush()
 	}
 }
 
-func parseModeLine(firstLine string, lastLine string) int {
-	ts := *global.tabstop
-	matches := global.modelineRegex.FindAllStringSubmatch(firstLine, 1)
+func GrepFile(path string, ft FileType, regexMode bool, tabstop int,
+	modelineRegex *regexp.Regexp, patternRegex *regexp.Regexp, inputPattern string) []GrepResult {
+	result := []GrepResult{}
+	if ft != BinaryFile {
+		fp, err := os.Open(path)
+		if err != nil {
+			panic(err)
+		}
+		defer fp.Close()
+
+		reader := bufio.NewReaderSize(fp, 1024)
+		lnum := 0
+		lines := []LineInfo{}
+		var line []byte
+		var firstLine []byte
+		var lastLine []byte
+		for {
+			tmp, isPrefix, err := reader.ReadLine()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				panic(err)
+			}
+			line = append(line, tmp...)
+			if !isPrefix {
+				lnum++
+				if ft == SJISFile {
+					result, _, _ := transform.Bytes(japanese.ShiftJIS.NewDecoder(), line)
+					line = result
+				}
+				if lnum == 1 {
+					firstLine = line
+				} else {
+					lastLine = line
+				}
+				lines = append(lines, LineInfo{string(line), lnum})
+				line = nil
+			}
+		}
+
+		ts := ParseModeLine(tabstop, modelineRegex, string(firstLine), string(lastLine))
+		for i := 0; i < len(lines); i++ {
+			lines[i].line = ExpandTabs(lines[i].line, ts)
+		}
+
+		for _, x := range lines {
+			var xs [][]int
+			if regexMode {
+				xs = patternRegex.FindAllIndex([]byte(x.line), -1)
+			} else {
+				xs = StringIndecies(x.line, inputPattern)
+			}
+			for i := 0; i < len(xs); i++ {
+				head := string(x.line[:xs[i][0]])
+				middle := string(x.line[xs[i][0]:xs[i][1]])
+				tail := string(x.line[xs[i][1]:])
+				col := runewidth.StringWidth(head) + 1
+				result = append(result, GrepResult{ path, x.lnum, col, head, middle, tail })
+			}
+		}
+	}
+	return result
+}
+
+func GetModeLineRegex() *regexp.Regexp {
+	return regexp.MustCompile("^(/|\\*|\\s)*vim?:\\s*set?\\s+.*\\bts=(\\d+).*:.*$")
+}
+
+func ParseModeLine(defaultTabStop int, re *regexp.Regexp, firstLine string, lastLine string, ) int {
+	ts := defaultTabStop
+	matches := re.FindAllStringSubmatch(firstLine, 1)
 	if 0 < len(matches) {
 		if sv, err := strconv.Atoi(matches[0][2]); err == nil {
 			ts = sv
 		}
 	}
-	matches = global.modelineRegex.FindAllStringSubmatch(lastLine, 1)
+	matches = re.FindAllStringSubmatch(lastLine, 1)
 	if 0 < len(matches) {
 		if sv, err := strconv.Atoi(matches[0][2]); err == nil {
 			ts = sv
@@ -187,7 +216,7 @@ func parseModeLine(firstLine string, lastLine string) int {
 	return ts
 }
 
-func expandTabs(s string, ts int) string {
+func ExpandTabs(s string, ts int) string {
 	text := ""
 	col := 0
 	for _, ch := range s {
@@ -226,7 +255,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Example:\n")
 		fmt.Fprintf(os.Stderr, "  >go-tsgrep -color -tabstop 4 set **/*\n")
 	}
-	global.detector = chardet.NewTextDetector()
 	global.stdOut = bufio.NewWriter(colorable.NewColorableStdout())
 	global.ignoreDirectories = flag.String("ignore-dir", ".git,.gh,.hg,.svn,_svn,node_modules", "ignore directories")
 	global.ignoreExtensions = flag.String("ignore-ext", ".exe,.dll,.obj,.mp3,mp4", "ignore extensions")
@@ -243,14 +271,14 @@ func main() {
 		if *global.regexMode {
 			global.patternRegex = regexp.MustCompile(*global.inputPattern)
 		}
-		global.modelineRegex = regexp.MustCompile("^(/|\\*|\\s)*vim?:\\s*set\\s+.*\\bts=(\\d+).*$")
+		global.modelineRegex = GetModeLineRegex()
 		var wg sync.WaitGroup
 		var mu sync.Mutex
 		if matches, err := zglob.Glob(args[1]); err == nil {
 			for i := 0; i < len(matches); i++ {
 				if f, err := os.Stat(matches[i]); !os.IsNotExist(err) && !f.IsDir() {
 					wg.Add(1)
-					go grep(&wg, &mu, matches[i])
+					go GrepWrapper(&wg, &mu, matches[i])
 				}
 			}
 		}

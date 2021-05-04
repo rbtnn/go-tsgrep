@@ -1,7 +1,18 @@
 
 # go-vgr
 
-`go-vgr` is grep for Vim.
+`go-vgr` is grep for Vim. This considers tabstop and modeline each file.  
+
+There are following lines as `abc.txt`:  
+```
+This tabstop is 4.
+--->This tabstop is 4.
+--->--->This tabstop is 4.
+// vim: set ts=4 :
+```
+And execute `go-vgr is abc.txt`:  
+![](https://raw.githubusercontent.com/rbtnn/go-vgr/main/abc.jpg)
+
 
 ## Install
 
@@ -23,7 +34,7 @@ Options:
   -detect int
         bytes of filetype detection (default 100)
   -ignore-dir string
-        ignore directories (default ".git,.gh,.hg,.svn,_svn")
+        ignore directories (default ".git,.gh,.hg,.svn,_svn,node_modules")
   -ignore-ext string
         ignore extensions (default ".exe,.dll,.obj,.mp3,mp4")
   -tabstop int
@@ -50,4 +61,7 @@ We recommend to use `-tabstop` option if `&tabstop` in your Vim is not 8.
 ```
 set grepprg=go-vgr\ -tabstop\ 4
 ```
+
+## License
+Distributed under MIT License. See LICENSE.
 

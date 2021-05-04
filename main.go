@@ -218,7 +218,7 @@ func main() {
 	}
 	global.detector = chardet.NewTextDetector()
 	global.stdOut = bufio.NewWriter(colorable.NewColorableStdout())
-	global.ignore_directories = flag.String("ignore-dir", ".git,.gh,.hg,.svn,_svn", "ignore directories")
+	global.ignore_directories = flag.String("ignore-dir", ".git,.gh,.hg,.svn,_svn,node_modules", "ignore directories")
 	global.ignore_extensions = flag.String("ignore-ext", ".exe,.dll,.obj,.mp3,mp4", "ignore extensions")
 	global.tabstop = flag.Int("tabstop", 8, "default tabstop")
 	global.debug = flag.Bool("debug", false, "debug mode")

@@ -27,9 +27,10 @@ var (
 		bytesOfDetection  *int
 		tabstop           *int
 		highlight         *bool
-		debugMode         *bool
 		ignoreDirectories *string
 		ignoreExtensions  *string
+		regexMode         *bool
+		inputPattern      *string
 		patternRegex      *regexp.Regexp
 		modelineRegex     *regexp.Regexp
 	}
@@ -100,16 +101,6 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 	defer fp.Close()
 
 	ft := checkFileType(fp)
-	if *global.debugMode {
-		if ft == BinaryFile {
-			fmt.Println(path + "(0,0): a binary file.")
-		} else if ft == UTF8File {
-			fmt.Println(path + "(0,0): a UTF-8 file.")
-		} else if ft == SJISFile {
-			fmt.Println(path + "(0,0): a Shift-JIS file.")
-		}
-		return
-	}
 	if ft == BinaryFile {
 		return
 	}
@@ -153,7 +144,12 @@ func grep(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 	mu.Lock()
 	defer mu.Unlock()
 	for _, x := range matches {
-		xs := global.patternRegex.FindAllIndex([]byte(x.line), -1)
+		var xs [][]int
+		if *global.regexMode {
+			xs = global.patternRegex.FindAllIndex([]byte(x.line), -1)
+		} else {
+			xs = StringIndecies(x.line, *global.inputPattern)
+		}
 		for i := 0; i < len(xs); i++ {
 			head := string(x.line[:xs[i][0]])
 			middle := string(x.line[xs[i][0]:xs[i][1]])
@@ -206,6 +202,20 @@ func expandTabs(s string, ts int) string {
 	return text
 }
 
+func StringIndecies(s string, substr string) [][]int {
+	var xs [][]int
+	offset := 0
+	for {
+		i := strings.Index(s[offset:], substr)
+		if -1 == i {
+			break
+		}
+		xs = append(xs, []int{offset + i, offset + i + len(substr)})
+		offset += i + len(substr)
+	}
+	return xs
+}
+
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s [OPTIONS] {pattern} {path}\n", os.Args[0])
@@ -221,14 +231,18 @@ func main() {
 	global.ignoreDirectories = flag.String("ignore-dir", ".git,.gh,.hg,.svn,_svn,node_modules", "ignore directories")
 	global.ignoreExtensions = flag.String("ignore-ext", ".exe,.dll,.obj,.mp3,mp4", "ignore extensions")
 	global.tabstop = flag.Int("tabstop", 8, "default tabstop")
-	global.debugMode = flag.Bool("debug", false, "debug mode")
 	global.bytesOfDetection = flag.Int("detect", 100, "bytes of filetype detection")
 	global.highlight = flag.Bool("color", false, "color matched text")
+	global.regexMode = flag.Bool("regex", false, "deal with {pattern} as regex")
+
 	flag.Parse()
 	args := flag.Args()
 	if 2 == len(args) {
 		start := time.Now()
-		global.patternRegex = regexp.MustCompile(args[0])
+		global.inputPattern = &args[0]
+		if *global.regexMode {
+			global.patternRegex = regexp.MustCompile(*global.inputPattern)
+		}
 		global.modelineRegex = regexp.MustCompile("^(/|\\*|\\s)*vim?:\\s*set\\s+.*\\bts=(\\d+).*$")
 		var wg sync.WaitGroup
 		var mu sync.Mutex
@@ -242,8 +256,6 @@ func main() {
 		}
 		wg.Wait()
 		elapsed := time.Since(start)
-		if !*global.debugMode {
-			fmt.Printf("elapsed time: %v\n", elapsed)
-		}
+		fmt.Printf("elapsed time: %v\n", elapsed)
 	}
 }

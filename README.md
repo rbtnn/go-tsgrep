@@ -24,25 +24,24 @@ And execute `go-tsgrep is abc.txt`:
 
 ```
 >go-tsgrep.exe -h
-go-tsgrep.exe [OPTIONS] {pattern} {path}
+go-tsgrep [OPTIONS] {pattern} {path}
 
 Options:
   -color
         color matched text
-  -debug
-        debug mode
   -detect int
         bytes of filetype detection (default 100)
   -ignore-dir string
         ignore directories (default ".git,.gh,.hg,.svn,_svn,node_modules")
   -ignore-ext string
         ignore extensions (default ".exe,.dll,.obj,.mp3,mp4")
+  -regex
+        deal with {pattern} as regex
   -tabstop int
         default tabstop (default 8)
 
 Example:
   >go-tsgrep -color -tabstop 4 set **/*
-
 ```
 
 ### Using Vim

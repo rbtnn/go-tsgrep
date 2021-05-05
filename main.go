@@ -54,12 +54,13 @@ const (
 	BinaryFile FileType = iota
 	UTF8File
 	SJISFile
+	UnknownFile
 )
 
-func CheckFileType(path string, bytesOfDetection int) FileType {
+func CheckFileType(path string, bytesOfDetection int) (FileType, error) {
 	fp, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		return UnknownFile, err
 	}
 	defer fp.Close()
 
@@ -69,7 +70,7 @@ func CheckFileType(path string, bytesOfDetection int) FileType {
 	if err == nil {
 		for i := 0; i < n; i++ {
 			if buf[i] == 0 {
-				return BinaryFile
+				return BinaryFile, nil
 			}
 		}
 	}
@@ -87,12 +88,12 @@ func CheckFileType(path string, bytesOfDetection int) FileType {
 			}
 		}
 		if isUTF8 {
-			return UTF8File
+			return UTF8File, nil
 		} else if isSJIS {
-			return SJISFile
+			return SJISFile, nil
 		}
 	}
-	return UTF8File
+	return UTF8File, nil
 }
 
 func GrepWrapper(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
@@ -108,7 +109,10 @@ func GrepWrapper(wg *sync.WaitGroup, mu *sync.Mutex, path string) {
 		return
 	}
 
-	ft := CheckFileType(path, *global.bytesOfDetection)
+	ft, err := CheckFileType(path, *global.bytesOfDetection)
+	if err != nil {
+		return
+	}
 
 	result := GrepFile(path, ft, *global.regexMode, *global.tabstop, global.modelineRegex, global.patternRegex, *global.inputPattern)
 
@@ -276,9 +280,11 @@ func main() {
 		var mu sync.Mutex
 		if matches, err := zglob.Glob(args[1]); err == nil {
 			for i := 0; i < len(matches); i++ {
-				if f, err := os.Stat(matches[i]); !os.IsNotExist(err) && !f.IsDir() {
-					wg.Add(1)
-					go GrepWrapper(&wg, &mu, matches[i])
+				if f, err := os.Stat(matches[i]); err == nil {
+					if !os.IsNotExist(err) && !f.IsDir() {
+						wg.Add(1)
+						go GrepWrapper(&wg, &mu, matches[i])
+					}
 				}
 			}
 		}

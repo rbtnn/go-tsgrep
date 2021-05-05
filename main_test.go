@@ -31,7 +31,7 @@ func TestStringIndecies_2(t *testing.T) {
 
 func TestCheckFileType_1(t *testing.T) {
 	expect := BinaryFile
-	actual := CheckFileType("./test/bin.txt", 100)
+	actual, _ := CheckFileType("./test/bin.txt", 100)
 	if actual != expect {
 		t.Errorf("actual: %q, expected: %q", actual, expect)
 	}
@@ -39,7 +39,7 @@ func TestCheckFileType_1(t *testing.T) {
 
 func TestCheckFileType_2(t *testing.T) {
 	expect := UTF8File
-	actual := CheckFileType("./test/utf8.txt", 100)
+	actual, _ := CheckFileType("./test/utf8.txt", 100)
 	if actual != expect {
 		t.Errorf("actual: %q, expected: %q", actual, expect)
 	}
@@ -47,7 +47,7 @@ func TestCheckFileType_2(t *testing.T) {
 
 func TestCheckFileType_3(t *testing.T) {
 	expect := SJISFile
-	actual := CheckFileType("./test/sjis.txt", 100)
+	actual, _ := CheckFileType("./test/sjis.txt", 100)
 	if actual != expect {
 		t.Errorf("actual: %q, expected: %q", actual, expect)
 	}

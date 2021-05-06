@@ -164,3 +164,24 @@ func TestGrepFile_2(t *testing.T) {
 		t.Errorf("actual: %q, expected: %q", actual, expect)
 	}
 }
+
+func TestGrepFile_3(t *testing.T) {
+	expect := []GrepResult{
+		GrepResult{"./test/utf8.txt", 4, 4, "ｻﾌﾞ", "ｼ", "ｽﾃﾑ"},
+	}
+	actual := GrepFile("./test/utf8.txt", UTF8File, false, 4, GetModeLineRegex(), nil, "ｼ")
+	if !reflect.DeepEqual(actual, expect) {
+		t.Errorf("actual: %q, expected: %q", actual, expect)
+	}
+}
+
+func TestGrepFile_4(t *testing.T) {
+	expect := []GrepResult{
+		GrepResult{"./test/sjis.txt", 4, 4, "ｻﾌﾞ", "ｼ", "ｽﾃﾑ"},
+	}
+	actual := GrepFile("./test/sjis.txt", SJISFile, false, 4, GetModeLineRegex(), nil, "ｼ")
+	if !reflect.DeepEqual(actual, expect) {
+		t.Errorf("actual: %q, expected: %q", actual, expect)
+	}
+}
+

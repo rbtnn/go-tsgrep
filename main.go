@@ -191,7 +191,7 @@ func GrepFile(path string, ft FileType, regexMode bool, tabstop int,
 				head := string(x.line[:xs[i][0]])
 				middle := string(x.line[xs[i][0]:xs[i][1]])
 				tail := string(x.line[xs[i][1]:])
-				col := runewidth.StringWidth(head) + 1
+				col := runewidth.StringWidth(head) + strings.Count(string(head), "ﾞ") + 1
 				result = append(result, GrepResult{ path, x.lnum, col, head, middle, tail })
 			}
 		}

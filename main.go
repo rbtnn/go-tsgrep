@@ -251,12 +251,15 @@ func StringIndecies(s string, substr string) [][]int {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s [OPTIONS] {pattern} {path}\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "%s [OPTIONS] {PATTERN} [{PATH}]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Example:\n")
+		fmt.Fprintf(os.Stderr, "PATH:\n")
+		fmt.Fprintf(os.Stderr, "  This default value is \"*\".\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "EXAMPLE:\n")
 		fmt.Fprintf(os.Stderr, "  >go-tsgrep -color -tabstop 4 set **/*\n")
 	}
 	global.stdOut = bufio.NewWriter(colorable.NewColorableStdout())
@@ -266,10 +269,9 @@ func main() {
 	global.bytesOfDetection = flag.Int("detect", 100, "bytes of filetype detection")
 	global.highlight = flag.Bool("color", false, "color matched text")
 	global.regexMode = flag.Bool("regex", false, "deal with {pattern} as regex")
-
 	flag.Parse()
 	args := flag.Args()
-	if 2 == len(args) {
+	if (1 == len(args)) || (2 == len(args)) {
 		start := time.Now()
 		global.inputPattern = &args[0]
 		if *global.regexMode {
@@ -278,7 +280,11 @@ func main() {
 		global.modelineRegex = GetModeLineRegex()
 		var wg sync.WaitGroup
 		var mu sync.Mutex
-		if matches, err := zglob.Glob(args[1]); err == nil {
+		var path = "*"
+		if (2 == len(args)) {
+			path = args[1]
+		}
+		if matches, err := zglob.Glob(path); err == nil {
 			for i := 0; i < len(matches); i++ {
 				if f, err := os.Stat(matches[i]); err == nil {
 					if !os.IsNotExist(err) && !f.IsDir() {
@@ -291,5 +297,7 @@ func main() {
 		wg.Wait()
 		elapsed := time.Since(start)
 		fmt.Printf("elapsed time: %v\n", elapsed)
+	} else {
+		flag.Usage()
 	}
 }

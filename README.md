@@ -24,9 +24,9 @@ And execute `go-tsgrep is abc.txt`:
 
 ```
 >go-tsgrep.exe -h
-go-tsgrep [OPTIONS] {pattern} {path}
+go-tsgrep.exe [OPTIONS] {PATTERN} [{PATH}]
 
-Options:
+OPTIONS:
   -color
         color matched text
   -detect int
@@ -40,7 +40,10 @@ Options:
   -tabstop int
         default tabstop (default 8)
 
-Example:
+PATH:
+  This default value is "*".
+
+EXAMPLE:
   >go-tsgrep -color -tabstop 4 set **/*
 ```
 
